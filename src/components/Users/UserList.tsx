@@ -1,35 +1,32 @@
 // src/components/Users/UserList.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Table, Button, Container } from 'react-bootstrap';
-import { deleteUser, fetchUsers } from '../services/api';
 import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { setUsers, selectUsers } from '../../features/userSlice';
+import { deleteUser, fetchUsers } from '../../services/api';
+import { User } from '../../types/apiTypes'; // Adjust the import based on your file structure
 
-interface User {
-    id: number;
-    first_name: string;
-    last_name: string;
-    email: string;
-    phone: string;
-}
+const UserList: React.FC = () => {
+  const token = localStorage.getItem('token') || '';
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-const UserList = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const token = localStorage.getItem('token') || ''; // Get your token from context or props
-  const navigate = useNavigate(); // Use navigate for programmatic navigation
+  const users = useSelector(selectUsers);
 
   useEffect(() => {
     const getUsers = async () => {
       try {
         const response = await fetchUsers(token);
-        const usersData = response.data as User[];
-        setUsers(usersData);
+        const usersData: User[] = response.data; // Expecting response to have a data property
+        dispatch(setUsers(usersData)); // Dispatch to Redux
       } catch (error) {
         console.error('Error fetching users:', error);
       }
     };
 
     getUsers();
-  }, [token]);
+  }, [token, dispatch]);
 
   if (!users.length) {
     return <div>No users found.</div>;
@@ -38,15 +35,17 @@ const UserList = () => {
   const handleDelete = async (id: number) => {
     try {
       await deleteUser(id, token);
-      setUsers(users.filter((user) => user.id !== id));
+      const updatedUsers = users.filter((user) => user.id !== id);
+      dispatch(setUsers(updatedUsers));
     } catch (error) {
       console.error('Error deleting user:', error);
     }
   };
 
   const handleCreateUser = () => {
-    navigate('/create-user'); // Navigate to the UserForm for creating a new user
+    navigate('/create-user');
   };
+
 
   return (
     <Container>

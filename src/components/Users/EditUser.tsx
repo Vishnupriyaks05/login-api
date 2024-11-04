@@ -1,8 +1,10 @@
 // src/components/Users/EditUser.tsx
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate  } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Form, Button, Container } from 'react-bootstrap';
-import { fetchUser, updateUser } from '../services/api';
+import { fetchUser, updateUser } from '../../services/api';
+import { useDispatch, useSelector } from 'react-redux';
+import { setUsers, selectUsers } from '../../features/userSlice'; // Import actions and selectors
 
 interface User {
   first_name: string;
@@ -13,9 +15,13 @@ interface User {
 
 const EditUser = () => {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate(); 
-  const [user, setUser] = useState<User | null>(null);
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
   const token = localStorage.getItem('token'); // Get your token from context or props
+
+  // Select users from Redux store
+  const users = useSelector(selectUsers);
+  const user = users.find(user => user.id === Number(id)); // Find the user to edit based on ID
 
   useEffect(() => {
     if (!id) {
@@ -29,20 +35,26 @@ const EditUser = () => {
         // You might want to redirect or show a message here
         return;
       }
+
       try {
-        const response = await fetchUser(id, token);
-        setUser(response.data as User); // Type assertion here
+        // Fetch the user if not found in Redux store
+        if (!user) {
+          const response = await fetchUser(id, token);
+          dispatch(setUsers([...users, response])); // Update Redux store with fetched user
+        }
       } catch (error) {
         console.error('Error fetching user:', error);
       }
     };
 
     getUser();
-  }, [id, token]);
+  }, [id, token, user, dispatch, users]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (user) {
-      setUser({ ...user, [e.target.name]: e.target.value } as User);
+      // Update user data in Redux directly
+      const updatedUser = { ...user, [e.target.name]: e.target.value };
+      dispatch(setUsers(users.map(u => (u.id === user.id ? updatedUser : u)))); // Update the user in the list
     }
   };
 
@@ -53,6 +65,7 @@ const EditUser = () => {
         console.error('Token not found');
         return;
       }
+
       try {
         await updateUser(Number(id), user, token);
         alert('User updated successfully!');
@@ -63,7 +76,6 @@ const EditUser = () => {
     }
   };
 
-  
   if (!user) return <div>Loading...</div>;
 
   return (

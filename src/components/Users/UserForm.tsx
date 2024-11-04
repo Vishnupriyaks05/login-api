@@ -1,31 +1,35 @@
 // src/components/Users/UserForm.tsx
-import React, { ChangeEvent, FormEvent, useState } from 'react';
+import React, { ChangeEvent, FormEvent, useEffect } from 'react';
 import { Form, Button, Container } from 'react-bootstrap';
-import { createUser, updateUser } from '../services/api';
+import { createUser, updateUser } from '../../services/api';
 import { useNavigate } from 'react-router-dom';
-
-interface User {
-    id?: number;
-    first_name: string;
-    last_name: string;
-    email: string;
-    phone: string;
-}
-
-interface UserFormProps {
-    user?: User;
-}
+import { useDispatch, useSelector } from 'react-redux';
+import { setUsers, selectUsers } from '../../features/userSlice';
+import { User, UserFormProps } from '../../types/apiTypes';
 
 const UserForm: React.FC<UserFormProps> = ({ user }) => {
-  const [formData, setFormData] = useState<User>({
-    first_name: user ? user.first_name : '',
-    last_name: user ? user.last_name : '',
-    email: user ? user.email : '',
-    phone: user ? user.phone : '',
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const token = localStorage.getItem('token') || '';
+  const users = useSelector(selectUsers);
+
+  const [formData, setFormData] = React.useState<Partial<User>>({
+    first_name: '',
+    last_name: '',
+    email: '',
+    phone: '',
   });
 
-  const token = localStorage.getItem('token') || '';
-  const navigate = useNavigate(); // Use navigate for programmatic navigation
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        phone: user.phone,
+      });
+    }
+  }, [user]);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -35,12 +39,32 @@ const UserForm: React.FC<UserFormProps> = ({ user }) => {
     e.preventDefault();
     try {
       if (user) {
-        await updateUser(user.id!, formData, token);
+        // Update logic
+        const updatedUser: User = {
+          id: user.id, // Ensure id is correctly assigned
+          first_name: formData.first_name || '',
+          last_name: formData.last_name || '',
+          email: formData.email || '',
+          phone: formData.phone || '',
+        };
+
+        const result = await updateUser(updatedUser.id, updatedUser, token);
+        dispatch(setUsers(users.map(u => (u.id === updatedUser.id ? result : u))));
       } else {
-        await createUser(formData, token);
+        // Create logic
+        const newUser: User = {
+          id: -1, // Temporary ID until saved; adjust as necessary based on your API
+          first_name: formData.first_name || '',
+          last_name: formData.last_name || '',
+          email: formData.email || '',
+          phone: formData.phone || '',
+        };
+
+        const createdUser = await createUser(newUser, token);
+        dispatch(setUsers([...users, createdUser]));
       }
-      alert('Check your email to set your password.'); // Show alert
-      navigate('/user-list'); // Navigate back to the user list after creating/updating
+      alert('Check your email to set your password.');
+      navigate('/user-list');
     } catch (error) {
       console.error('Error saving user:', error);
     }
